@@ -10,6 +10,7 @@ readme = "README.md"
 license = { file = "LICENSE" }
 classifiers = []
 dependencies = [
+    "build>=0.8",
     "tomli; python_version < '3.11'",
 ]
 
