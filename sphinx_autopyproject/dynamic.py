@@ -1,11 +1,38 @@
 import ast
 import importlib
+import sys
 from dataclasses import dataclass
 from pathlib import Path
 from types import ModuleType
 from typing import Any, Dict, Iterable, Union
 
 NAMESPACE_CACHE: Dict[str, Any] = {}
+
+
+def _extract_name_from_exception(e: Union[AttributeError, NameError]):
+    if hasattr(e, 'name') and e.name is not None:
+        return e.name
+    # Python 3.8, 3.9
+    if isinstance(e, AttributeError):
+        return e.args[0].split(' has no attribute ', maxsplit=1)[1][1:-1]
+    if isinstance(e, NameError):
+        return (
+            e.args[0]
+            .split('name ', maxsplit=1)[1]
+            .rsplit(' is not defined', maxsplit=1)[0][1:-1]
+        )
+    raise RuntimeError('Unsupported Exception')
+
+
+def _extract_module_from_exception(e: AttributeError):
+    if hasattr(e, 'obj') and e.obj is not None:
+        return e.obj
+    # Python 3.8, 3.9
+    return sys.modules[
+        e.args[0]
+        .split(' has no attribute ', maxsplit=1)[0]
+        .split('module ', maxsplit=1)[1][1:-1]
+    ]
 
 
 def get_python(value: str, namespace=None) -> Any:
@@ -21,11 +48,13 @@ def get_python(value: str, namespace=None) -> Any:
             # pylint: disable=eval-used
             return eval(value, namespace)
         except NameError as e:
-            _load(e.name)  # type: ignore
+            _load(_extract_name_from_exception(e))  # type: ignore
         except AttributeError as e:
-            if not isinstance(e.obj, ModuleType):  # type: ignore
+            obj = _extract_module_from_exception(e)
+            name = _extract_name_from_exception(e)
+            if not isinstance(obj, ModuleType):  # type: ignore
                 raise
-            _load(f'{e.obj.__name__}.{e.name}')  # type: ignore
+            _load(f'{obj.__name__}.{name}')  # type: ignore
         except Exception as e:
             raise RuntimeError(f"Error evaluating '{value}': {e!r}") from e
 
@@ -35,7 +64,7 @@ def get_token(value: str, encoding: str = "utf-8") -> str:
 
     for line in Path(file_name).read_text(encoding).splitlines(keepends=True):
         if line.startswith(token):
-            return ast.literal_eval(line.split("=", 1)[1])
+            return ast.literal_eval(line.split("=", maxsplit=1)[1].strip())
     raise RuntimeError(f"{token} not found in {file_name}")
 
 
