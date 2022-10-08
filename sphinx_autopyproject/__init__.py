@@ -8,7 +8,7 @@ import tomli
 from .dynamic import DynamicField
 from .util import restore_cwd
 
-__version__ = '0.0.1'
+__version__ = '0.0.2'
 
 PYPROJECT_TOML = "pyproject.toml"
 TOOL_KEY = "sphinx-autopyproject"
